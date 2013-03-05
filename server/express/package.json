@@ -20,7 +20,8 @@
     "JSONStream": "*",
     "async": "*",
     "config-chain": "*",
-    "glob": "*"
+    "glob": "*",
+    "node-getopt": "*"
   },
   "scripts": {
     "test": "./node_modules/mocha/bin/mocha",

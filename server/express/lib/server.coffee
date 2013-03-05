@@ -35,6 +35,10 @@ defargs = require './defaultargs'
 synopsis = require '../../../client/lib/synopsis'
 pluginsFactory = require './plugins'
 
+# NeighborNet BEGIN
+require 'wsproxy'
+# NeighborNet END
+
 # pageFactory can be easily replaced here by requiring your own page handler
 # factory, which gets called with the argv object, and then has get and put
 # methods that accept the same arguments and callbacks. That would be the

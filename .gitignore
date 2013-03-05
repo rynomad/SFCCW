@@ -9,5 +9,5 @@
 /client/plugins/*/test.js
 /client/chart/
 /client/garden/
-node_modules
+node-modules
 npm-debug.log
