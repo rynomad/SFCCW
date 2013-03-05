@@ -259,6 +259,7 @@ module.exports = exports = (argv) ->
   app.configure ->
     app.set('views', path.join(__dirname, '..', '/views'))
     app.set('view engine', 'hbs')
+    app.set('view engine', 'jade')
     app.register('.html', hbs)
     app.set('view options', layout: false)
     app.use(express.cookieParser())
@@ -271,7 +272,20 @@ module.exports = exports = (argv) ->
     app.use(app.router)
     app.use(express.static(argv.c))
     app.use(openIDErr)
+    app.use(express.static(path.join(__dirname, '..', '/public')))
+    
+    
+    ### NEIGHBORNET BEGIN ###
+    
+    app.get '/ndn', (req, res) ->
+      res.render('test-get-async.html')
 
+    app.get '/segs', (req, res) ->
+      res.render('segs.html')
+    
+    ### NEIGHBORNET END ###
+    
+    
   ##### Set up standard environments. #####
   # In dev mode turn on console.log debugging as well as showing the stack on err.
   app.configure 'development', ->
