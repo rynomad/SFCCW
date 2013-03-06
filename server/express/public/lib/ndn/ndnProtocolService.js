@@ -85,7 +85,7 @@ ContentClosure.prototype.upcall = function(kind, upcallInfo) {
         */
         
 
-        console.log(segmentNumber);
+        console.log('segmentNumber:', segmentNumber);
 
 
         this.didOnStart = true;

@@ -275,15 +275,18 @@ module.exports = exports = (argv) ->
     app.use(express.static(path.join(__dirname, '..', '/public')))
     
     
-    ### NEIGHBORNET BEGIN ###
-    
-    app.get '/ndn', (req, res) ->
-      res.render('test-get-async.html')
+  ### NEIGHBORNET BEGIN ###
+  
+  app.get '/ndn', (req, res) ->
+    res.render('test-get-async.html')
 
-    app.get '/segs', (req, res) ->
-      res.render('segs.html')
-    
-    ### NEIGHBORNET END ###
+  app.get '/segs', (req, res) ->
+    res.render('segs.html')
+  
+  app.get '/pt', (req, res) ->
+    res.render('NDNProtocoltest.html')
+  
+  ### NEIGHBORNET END ###
     
     
   ##### Set up standard environments. #####

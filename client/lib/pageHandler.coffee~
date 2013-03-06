@@ -2,11 +2,9 @@ util = require('./util')
 state = require('./state')
 revision = require('./revision')
 addToJournal = require('./addToJournal')
-
+# require('../../server/express/public/lib/ndn/ndn.js')
 
 module.exports = pageHandler = {}
-
-
 
 pageFromLocalStorage = (slug)->
   if json = localStorage[slug]
@@ -14,15 +12,32 @@ pageFromLocalStorage = (slug)->
   else
     undefined
 
+###
+
 recursiveGet = ({pageInformation, whenGotten, whenNotGotten, localContext}) ->
   {slug,rev,site} = pageInformation
 
+  if site
+    localContext = []
+  else
+    site = localContext.shift()
 
-  ndn = new NDN(host: "localhost")
-  name = new Name('/sfw/#{slug}.json')
-  page = ndn.expressInterest(name, new ContentClosure(ndn, name, new Interest(name)))
+  site = null if site=='view'
 
-###
+  if site?
+    if site == 'local'
+      if localPage = pageFromLocalStorage(pageInformation.slug)
+        return whenGotten( localPage, 'local' )
+      else
+        return whenNotGotten()
+    else
+      if site == 'origin'
+        url = "/#{slug}.json"
+      else
+        url = "http://#{site}/#{slug}.json"
+  else
+    url = "/#{slug}.json"
+
   $.ajax
     type: 'GET'
     dataType: 'json'
@@ -45,7 +60,24 @@ recursiveGet = ({pageInformation, whenGotten, whenNotGotten, localContext}) ->
         recursiveGet( {pageInformation, whenGotten, whenNotGotten, localContext} )
       else
         whenNotGotten()
+        
 ###
+
+### NeighborNet BEGIN  ###
+
+ndn = new NDN({host: 'localhost'})
+
+###
+run = () ->
+  name = new Name(document.getElementById('interest').value)
+  content = ndn.expressInterest(name, new ContentClosure(ndn, name, new Interest(name)))
+  # console.log contentObject
+	
+display = () ->
+  console.log fullcontent
+###
+### NeighborNet END  ###
+
 pageHandler.get = ({whenGotten,whenNotGotten,pageInformation}  ) ->
 
   unless pageInformation.site

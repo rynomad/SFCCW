@@ -2,6 +2,7 @@ util = require('./util')
 state = require('./state')
 revision = require('./revision')
 addToJournal = require('./addToJournal')
+# require('../../server/express/public/lib/ndn/ndn.js')
 
 module.exports = pageHandler = {}
 
@@ -10,6 +11,8 @@ pageFromLocalStorage = (slug)->
     JSON.parse(json)
   else
     undefined
+
+###
 
 recursiveGet = ({pageInformation, whenGotten, whenNotGotten, localContext}) ->
   {slug,rev,site} = pageInformation
@@ -57,6 +60,23 @@ recursiveGet = ({pageInformation, whenGotten, whenNotGotten, localContext}) ->
         recursiveGet( {pageInformation, whenGotten, whenNotGotten, localContext} )
       else
         whenNotGotten()
+        
+###
+
+### NeighborNet BEGIN  ###
+
+ndn = new NDN({host: 'localhost'})
+
+###
+run = () ->
+  name = new Name(document.getElementById('interest').value)
+  content = ndn.expressInterest(name, new ContentClosure(ndn, name, new Interest(name)))
+  # console.log contentObject
+	
+display = () ->
+  console.log fullcontent
+###
+### NeighborNet END  ###
 
 pageHandler.get = ({whenGotten,whenNotGotten,pageInformation}  ) ->
 

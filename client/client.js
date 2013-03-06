@@ -432,7 +432,7 @@ process.binding = function (name) {
 
 });
 
-require.define("/lib/wiki.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/wiki.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var createSynopsis, wiki,
     __slice = [].slice;
 
@@ -531,7 +531,7 @@ require.define("/lib/wiki.coffee",function(require,module,exports,__dirname,__fi
 
 });
 
-require.define("/lib/synopsis.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/synopsis.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
 
   module.exports = function(page) {
     var p1, p2, synopsis;
@@ -562,7 +562,7 @@ require.define("/lib/synopsis.coffee",function(require,module,exports,__dirname,
 
 });
 
-require.define("/lib/legacy.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/legacy.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var active, pageHandler, plugin, refresh, state, util;
 
   util = require('./util.coffee');
@@ -933,7 +933,7 @@ require.define("/lib/legacy.coffee",function(require,module,exports,__dirname,__
 
 });
 
-require.define("/lib/util.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/util.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var util;
 
   module.exports = wiki.util = util = {};
@@ -1062,8 +1062,8 @@ require.define("/lib/util.coffee",function(require,module,exports,__dirname,__fi
 
 });
 
-require.define("/lib/pageHandler.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
-  var addToJournal, pageFromLocalStorage, pageHandler, pushToLocal, pushToServer, recursiveGet, revision, state, util;
+require.define("/client/lib/pageHandler.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+  var addToJournal, ndn, pageFromLocalStorage, pageHandler, pushToLocal, pushToServer, revision, state, util;
 
   util = require('./util');
 
@@ -1072,6 +1072,8 @@ require.define("/lib/pageHandler.coffee",function(require,module,exports,__dirna
   revision = require('./revision');
 
   addToJournal = require('./addToJournal');
+
+  require('../../server/express/public/lib/ndn/ndn.js');
 
   module.exports = pageHandler = {};
 
@@ -1084,74 +1086,79 @@ require.define("/lib/pageHandler.coffee",function(require,module,exports,__dirna
     }
   };
 
-  recursiveGet = function(_arg) {
-    var localContext, localPage, pageInformation, rev, site, slug, url, whenGotten, whenNotGotten;
-    pageInformation = _arg.pageInformation, whenGotten = _arg.whenGotten, whenNotGotten = _arg.whenNotGotten, localContext = _arg.localContext;
-    slug = pageInformation.slug, rev = pageInformation.rev, site = pageInformation.site;
-    if (site) {
-      localContext = [];
-    } else {
-      site = localContext.shift();
-    }
-    if (site === 'view') {
-      site = null;
-    }
-    if (site != null) {
-      if (site === 'local') {
-        if (localPage = pageFromLocalStorage(pageInformation.slug)) {
-          return whenGotten(localPage, 'local');
-        } else {
-          return whenNotGotten();
-        }
-      } else {
-        if (site === 'origin') {
-          url = "/" + slug + ".json";
-        } else {
-          url = "http://" + site + "/" + slug + ".json";
-        }
-      }
-    } else {
-      url = "/" + slug + ".json";
-    }
-    return $.ajax({
-      type: 'GET',
-      dataType: 'json',
-      url: url + ("?random=" + (util.randomBytes(4))),
-      success: function(page) {
-        if (rev) {
-          page = revision.create(rev, page);
-        }
-        return whenGotten(page, site);
-      },
-      error: function(xhr, type, msg) {
-        var report;
-        if ((xhr.status !== 404) && (xhr.status !== 0)) {
-          wiki.log('pageHandler.get error', xhr, xhr.status, type, msg);
-          report = {
-            'title': "" + xhr.status + " " + msg,
+  /*
+  
+  recursiveGet = ({pageInformation, whenGotten, whenNotGotten, localContext}) ->
+    {slug,rev,site} = pageInformation
+  
+    if site
+      localContext = []
+    else
+      site = localContext.shift()
+  
+    site = null if site=='view'
+  
+    if site?
+      if site == 'local'
+        if localPage = pageFromLocalStorage(pageInformation.slug)
+          return whenGotten( localPage, 'local' )
+        else
+          return whenNotGotten()
+      else
+        if site == 'origin'
+          url = "/#{slug}.json"
+        else
+          url = "http://#{site}/#{slug}.json"
+    else
+      url = "/#{slug}.json"
+  
+    $.ajax
+      type: 'GET'
+      dataType: 'json'
+      url: url + "?random=#{util.randomBytes(4)}"
+      success: (page) ->
+        page = revision.create rev, page if rev
+        return whenGotten(page,site)
+      error: (xhr, type, msg) ->
+        if (xhr.status != 404) and (xhr.status != 0)
+          wiki.log 'pageHandler.get error', xhr, xhr.status, type, msg
+          report =
+            'title': "#{xhr.status} #{msg}"
             'story': [
-              {
-                'type': 'paragraph',
-                'id': '928739187243',
-                'text': "<pre>" + xhr.responseText
-              }
+              'type': 'paragraph'
+              'id': '928739187243'
+              'text': "<pre>#{xhr.responseText}"
             ]
-          };
-          return whenGotten(report, 'local');
-        }
-        if (localContext.length > 0) {
-          return recursiveGet({
-            pageInformation: pageInformation,
-            whenGotten: whenGotten,
-            whenNotGotten: whenNotGotten,
-            localContext: localContext
-          });
-        } else {
-          return whenNotGotten();
-        }
-      }
-    });
-  };
+          return whenGotten report, 'local'
+        if localContext.length > 0
+          recursiveGet( {pageInformation, whenGotten, whenNotGotten, localContext} )
+        else
+          whenNotGotten()
+  */
+
+
+  /* NeighborNet BEGIN
+  */
+
+
+  ndn = new NDN({
+    host: 'localhost'
+  });
+
+  /*
+  run = () ->
+    name = new Name(document.getElementById('interest').value)
+    content = ndn.expressInterest(name, new ContentClosure(ndn, name, new Interest(name)))
+    # console.log contentObject
+  	
+  display = () ->
+    console.log fullcontent
+  */
+
+
+  /* NeighborNet END
+  */
+
 
   pageHandler.get = function(_arg) {
     var localPage, pageInformation, whenGotten, whenNotGotten;
@@ -1286,7 +1293,7 @@ require.define("/lib/pageHandler.coffee",function(require,module,exports,__dirna
 
 });
 
-require.define("/lib/state.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/state.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var active, state,
     __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
@@ -1402,7 +1409,7 @@ require.define("/lib/state.coffee",function(require,module,exports,__dirname,__f
 
 });
 
-require.define("/lib/active.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/active.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var active, findScrollContainer, scrollTo;
 
   module.exports = active = {};
@@ -1459,7 +1466,7 @@ require.define("/lib/active.coffee",function(require,module,exports,__dirname,__
 
 });
 
-require.define("/lib/revision.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/revision.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var create;
 
   create = function(revIndex, data) {
@@ -1528,7 +1535,7 @@ require.define("/lib/revision.coffee",function(require,module,exports,__dirname,
 
 });
 
-require.define("/lib/addToJournal.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/addToJournal.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var util;
 
   util = require('./util');
@@ -1559,7 +1566,90 @@ require.define("/lib/addToJournal.coffee",function(require,module,exports,__dirn
 
 });
 
-require.define("/lib/plugin.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/server/express/public/lib/ndn/ndn.js",function(require,module,exports,__dirname,__filename,process,global){/**
+ * Pollyfill for ECMA forEach spec
+ */
+ // Production steps of ECMA-262, Edition 5, 15.4.4.18
+// Reference: http://es5.github.com/#x15.4.4.18
+if ( !Array.prototype.forEach ) {
+ 
+  Array.prototype.forEach = function forEach( callback, thisArg ) {
+ 
+    var T, k;
+ 
+    if ( this == null ) {
+      throw new TypeError( "this is null or not defined" );
+    }
+ 
+    // 1. Let O be the result of calling ToObject passing the |this| value as the argument.
+    var O = Object(this);
+ 
+    // 2. Let lenValue be the result of calling the Get internal method of O with the argument "length".
+    // 3. Let len be ToUint32(lenValue).
+    var len = O.length >>> 0; // Hack to convert O.length to a UInt32
+ 
+    // 4. If IsCallable(callback) is false, throw a TypeError exception.
+    // See: http://es5.github.com/#x9.11
+    if ( {}.toString.call(callback) !== "[object Function]" ) {
+      throw new TypeError( callback + " is not a function" );
+    }
+ 
+    // 5. If thisArg was supplied, let T be thisArg; else let T be undefined.
+    if ( thisArg ) {
+      T = thisArg;
+    }
+ 
+    // 6. Let k be 0
+    k = 0;
+ 
+    // 7. Repeat, while k < len
+    while( k < len ) {
+ 
+      var kValue;
+ 
+      // a. Let Pk be ToString(k).
+      //   This is implicit for LHS operands of the in operator
+      // b. Let kPresent be the result of calling the HasProperty internal method of O with argument Pk.
+      //   This step can be combined with c
+      // c. If kPresent is true, then
+      if ( Object.prototype.hasOwnProperty.call(O, k) ) {
+ 
+        // i. Let kValue be the result of calling the Get internal method of O with argument Pk.
+        kValue = O[ k ];
+ 
+        // ii. Call the Call internal method of callback with T as the this value and
+        // argument list containing kValue, k, and O.
+        callback.call( T, kValue, k, O );
+      }
+      // d. Increase k by 1.
+      k++;
+    }
+    // 8. return undefined
+  };
+}
+
+(function(fileIncludes){
+	var i = 0;
+	fileIncludes.forEach(function(item, i, array){
+		console.log('###', item);
+		var script = document.createElement('script');
+		script.src = '../lib/ndn/' + item
+		script.type = 'text/javascript';
+		document.head.appendChild(script);
+	});
+})(['ndn-js.js', 'ndn-closures.js', 'ndn-utils.js']);
+
+
+
+
+
+
+
+
+
+});
+
+require.define("/client/lib/plugin.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var getScript, plugin, scripts, util;
 
   util = require('./util.coffee');
@@ -1700,7 +1790,7 @@ require.define("/lib/plugin.coffee",function(require,module,exports,__dirname,__
 
 });
 
-require.define("/lib/refresh.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/refresh.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var addToJournal, buildPageHeader, createFactory, emitHeader, emitTwins, handleDragging, initAddButton, initDragging, neighborhood, pageHandler, plugin, refresh, renderPageIntoPageElement, state, util, wiki,
     __slice = [].slice;
 
@@ -2060,7 +2150,7 @@ require.define("/lib/refresh.coffee",function(require,module,exports,__dirname,_
 
 });
 
-require.define("/lib/neighborhood.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/neighborhood.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var active, createSearch, neighborhood, nextAvailableFetch, nextFetchInterval, populateSiteInfoFor, util, _ref,
     __hasProp = {}.hasOwnProperty;
 
@@ -2210,7 +2300,7 @@ require.define("/lib/neighborhood.coffee",function(require,module,exports,__dirn
 
 });
 
-require.define("/lib/search.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/lib/search.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
   var active, createSearch, util;
 
   util = require('./util');
@@ -2266,7 +2356,7 @@ require.define("/lib/search.coffee",function(require,module,exports,__dirname,__
 
 });
 
-require.define("/client.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+require.define("/client/client.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
 
   window.wiki = require('./lib/wiki');
 
@@ -2275,5 +2365,5 @@ require.define("/client.coffee",function(require,module,exports,__dirname,__file
 }).call(this);
 
 });
-require("/client.coffee");
+require("/client/client.coffee");
 })();
