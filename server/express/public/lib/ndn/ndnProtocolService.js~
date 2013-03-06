@@ -20,7 +20,7 @@ var ContentClosure = function ContentClosure
       (ndn, name, segmentTemplate) {
     // Inherit from Closure.
     Closure.call(this);
-    name = new Name(name);
+    
     this.ndn = ndn;
     this.name = new Name(name);
     this.segmentTemplate = segmentTemplate;
@@ -32,7 +32,7 @@ var ContentClosure = function ContentClosure
     this.didRequestFinalSegment = false;
     this.finalSegmentNumber = null;
     this.didOnStart = false;
-    this.uriEndsWithSegmentNumber = endsWithSegmentNumber(name.to_uri());
+    this.uriEndsWithSegmentNumber = endsWithSegmentNumber(this.name.to_uri());
     this.done = false;
 
     var fullcontent = '';

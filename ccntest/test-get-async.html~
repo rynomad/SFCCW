@@ -12,6 +12,8 @@
 	
 	<script type="text/javascript" src="../server/express/public/lib/ndn/ndn-js.js"></script>
 
+        <script type="text/javascript" src="../server/express/public/lib/ndn/ndnProtocolService.js"></script>
+
 	<script type="text/javascript">
 		var ndn = new NDN({host: "localhost"});
         
@@ -36,6 +38,8 @@
 				//console.log("In callback, content: ");
 				//console.log(content);
 				document.getElementById('content').innerHTML += contentObjectToHtml(content);
+
+                                console.log(DataUtils.toString(content.content));
 			} else if (kind == Closure.UPCALL_CONTENT_BAD) {
 				var content = upcallInfo.contentObject;
 				console.log("Closure.upcall: content signature verification fail.");

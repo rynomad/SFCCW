@@ -20,9 +20,9 @@ var ContentClosure = function ContentClosure
       (ndn, name, segmentTemplate) {
     // Inherit from Closure.
     Closure.call(this);
-    name = new Name(name);
+    
     this.ndn = ndn;
-    this.name = new Name(name);
+    this.name = name;
     this.segmentTemplate = segmentTemplate;
 
 

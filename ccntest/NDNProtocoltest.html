@@ -13,51 +13,24 @@
 	<script type="text/javascript" src="../server/express/public/lib/ndn/ndn-js.js"></script>
 
         <script type="text/javascript" src="../server/express/public/lib/ndn/ndnProtocolService.js"></script>
+   
+        <script type="text/javascript" src="../server/express/public/lib/ndn/ndn-utils.js"></script>>
 
 	<script type="text/javascript">
-		var ndn = new NDN();
+		var ndn = new NDN({host: 'localhost'});
         
-        var AsyncGetClosure = function AsyncGetClosure() {
-        	// Inherit from Closure.
-			Closure.call(this);
-		};
-		
-		AsyncGetClosure.prototype.upcall = function(kind, upcallInfo) {
-			//console.log("Closure.upcall() executed.");
-			if (kind == Closure.UPCALL_FINAL) {
-				// Do nothing.
-			} else if (kind == Closure.UPCALL_CONTENT) {
-				console.log("Closure.upcall: content signature verification pass.");
-                console.log("Host: " + ndn.host + ":" + ndn.port);
-				var content = upcallInfo.contentObject;
-				//console.log(content.name);
-				nameStr = escape(content.name.getName());
-				document.getElementById('content').innerHTML += "<p>Name string: " + nameStr + "</p>";
-				document.getElementById('content').innerHTML += "<p>Content buffer length: " + content.content.length + "</p>";
-				//console.log("In callback, nameStr: " + nameStr);
-				//console.log("In callback, content: ");
-				//console.log(content);
-				document.getElementById('content').innerHTML += contentObjectToHtml(content);
-			} else if (kind == Closure.UPCALL_CONTENT_BAD) {
-				var content = upcallInfo.contentObject;
-				console.log("Closure.upcall: content signature verification fail.");
-                console.log("Host: " + ndn.host + ":" + ndn.port);
-				if (content.signature.signature)
-					console.log("Signature: " + DataUtils.toHex(content.signature.signature).toLowerCase());
-				if (content.signature.Witness)
-					console.log("Witness: " + DataUtils.toHex(content.signature.Witness).toLowerCase());
-			} else if (kind == Closure.UPCALL_INTEREST_TIMED_OUT) {
-				console.log("Closure.upcall called with interest time out. Re-expressing the interest.");
-                console.log("Host: " + ndn.host + ":" + ndn.port);
-                return Closure.RESULT_REEXPRESS;
-			}
-			return Closure.RESULT_OK;
-		};
-		
 		
 		function run() {
-			ndn.expressInterest(new Name(document.getElementById('interest').value), ContentClosure());
+                        var name = new Name(document.getElementById('interest').value);
+			var content = ndn.expressInterest(name, new ContentClosure(ndn, name, new Interest(name)));
+                        console.log(content);
 		}
+
+                function display() {
+                        console.log(fullcontent);
+                }
+                        
+		
 		
 	</script>
 	
@@ -70,6 +43,7 @@
 	</form>
 
 	<button id="testBtn" onclick="run()">Fetch Content</button>
+        <button id="display" onclick="display()">display content</button>
 	
 	<p id="content">Content: <br/></p>
 
