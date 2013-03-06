@@ -20,9 +20,9 @@ var ContentClosure = function ContentClosure
       (ndn, name, segmentTemplate) {
     // Inherit from Closure.
     Closure.call(this);
-    name = new Name(name);
+    
     this.ndn = ndn;
-    this.name = new Name(name);
+    this.name = name;
     this.segmentTemplate = segmentTemplate;
 
 
@@ -35,7 +35,7 @@ var ContentClosure = function ContentClosure
     this.uriEndsWithSegmentNumber = endsWithSegmentNumber(name.to_uri());
     this.done = false;
 
-    var fullcontent = '';
+    this.fullcontent = '';
 
 };
 
@@ -144,7 +144,7 @@ ContentClosure.prototype.upcall = function(kind, upcallInfo) {
         segmentNumber = entry.key;
         contentObject = entry.value;
 
-        fullcontent = fullcontent + DataUtils.toString(entry.value.content);
+        this.fullcontent = this.fullcontent + DataUtils.toString(entry.value.content);
 
         console.log('currebt segment:' + segmentNumber);
 

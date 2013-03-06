@@ -22,7 +22,7 @@ var ContentClosure = function ContentClosure
     Closure.call(this);
     
     this.ndn = ndn;
-    this.name = new Name(name);
+    this.name = name;
     this.segmentTemplate = segmentTemplate;
 
 
