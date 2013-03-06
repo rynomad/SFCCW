@@ -27,7 +27,7 @@
 		}
 
                 function display() {
-                        console.log(content.fullcontent);
+                        console.log(content);
                 }
                         
 		
