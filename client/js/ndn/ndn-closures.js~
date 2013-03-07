@@ -17,7 +17,7 @@
  * The uses ExponentialReExpressClosure in expressInterest to re-express if fetching a segment times out.
  */                                                
 var ContentClosure = function ContentClosure
-      (ndn, name, segmentTemplate) {
+      (ndn, name, segmentTemplate, site) {
     // Inherit from Closure.
     Closure.call(this);
     
@@ -36,7 +36,7 @@ var ContentClosure = function ContentClosure
     this.done = false;
 
     this.fullcontent = '';
-
+    this.site = site
 };
 
 ContentClosure.prototype.upcall = function(kind, upcallInfo) {
@@ -106,6 +106,8 @@ ContentClosure.prototype.upcall = function(kind, upcallInfo) {
 
 
         var contentTypeEtc = getNameContentTypeAndCharset(contentObject.name);
+        
+        this.contentTypeEtc = contentTypeEtc
 
         console.log('contentTypeEtc', contentTypeEtc);
 
@@ -162,7 +164,6 @@ ContentClosure.prototype.upcall = function(kind, upcallInfo) {
                 dump("Content does not match digest in name " + contentObject.name.to_uri());
             this.done = true;
             console.log('kinda hungry');
-          
             console.log(this.fullcontent);
             return Closure.RESULT_OK;
         }

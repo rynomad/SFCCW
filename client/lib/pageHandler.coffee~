@@ -1,10 +1,13 @@
-util = require('./util')
-state = require('./state')
-revision = require('./revision')
-addToJournal = require('./addToJournal')
-# require('../../server/express/public/lib/ndn/ndn.js')
+util = require('./util.coffee')
+state = require('./state.coffee')
+revision = require('./revision.coffee')
+addToJournal = require('./addToJournal.coffee')
+step = require('step')
+ndnClosures = require('./ndnClosures')
+
 
 module.exports = pageHandler = {}
+
 
 pageFromLocalStorage = (slug)->
   if json = localStorage[slug]
@@ -12,10 +15,10 @@ pageFromLocalStorage = (slug)->
   else
     undefined
 
-###
-
 recursiveGet = ({pageInformation, whenGotten, whenNotGotten, localContext}) ->
   {slug,rev,site} = pageInformation
+
+
 
   if site
     localContext = []
@@ -38,47 +41,75 @@ recursiveGet = ({pageInformation, whenGotten, whenNotGotten, localContext}) ->
   else
     url = "/#{slug}.json"
 
-  $.ajax
-    type: 'GET'
-    dataType: 'json'
-    url: url + "?random=#{util.randomBytes(4)}"
-    success: (page) ->
-      page = revision.create rev, page if rev
-      return whenGotten(page,site)
-    error: (xhr, type, msg) ->
-      if (xhr.status != 404) and (xhr.status != 0)
-        wiki.log 'pageHandler.get error', xhr, xhr.status, type, msg
-        report =
-          'title': "#{xhr.status} #{msg}"
-          'story': [
-            'type': 'paragraph'
-            'id': '928739187243'
-            'text': "<pre>#{xhr.responseText}"
-          ]
-        return whenGotten report, 'local'
-      if localContext.length > 0
-        recursiveGet( {pageInformation, whenGotten, whenNotGotten, localContext} )
-      else
-        whenNotGotten()
-        
-###
 
-### NeighborNet BEGIN  ###
 
-ndn = new NDN({host: 'localhost'})
+#  closure = new ContentClosure(ndn, name, new Interest(name))
+# ndn.expressInterest(name, closure)
+#  while closure.fullcontent == null
+#    console.log('waiting')
+#    whenGotten(page.site)
+#  
+#
+#  page = closure.fullcontent
+#  console.log(page)
+#  page = JSON.parse(closure.fullcontent)
+#  console.log(page)
+#
+# whenGotten(page,site)
 
-###
-run = () ->
-  name = new Name(document.getElementById('interest').value)
-  content = ndn.expressInterest(name, new ContentClosure(ndn, name, new Interest(name)))
-  # console.log contentObject
-	
-display = () ->
-  console.log fullcontent
-###
-### NeighborNet END  ###
+  ndn = new NDN({host: 'localhost'})
+  name = new Name('/sfw' + url)
+  interest = new Interest(name)
+#  callback = (site) ->
+#    page = JSON.parse(this.fullcontent)
+#    whenGotten(page,site)
 
-pageHandler.get = ({whenGotten,whenNotGotten,pageInformation}  ) ->
+
+
+  closure = new ContentClosure(ndn, name, interest)
+  closure
+
+#  ndn.expressInterest(name, closure)
+  alert("this is a sanity check to see if I've fucked anything up in the last 12 hours")
+  alert(closure.fullcontent)
+
+  page = JSON.parse(closure.fullcontent)
+  whenGotten(page,site)
+
+
+#  $.ajax
+#    type: 'GET'
+#    dataType: 'json'
+#    url: url + "?random=#{util.randomBytes(4)}"
+#    success: (page) ->
+#      page = revision.create rev, page if rev
+#      return whenGotten(page,site)
+#    error: (xhr, type, msg) ->
+#      if (xhr.status != 404) and (xhr.status != 0)
+#        wiki.log 'pageHandler.get error', xhr, xhr.status, type, msg
+#        report =
+#          'title': "#{xhr.status} #{msg}"
+#          'story': [
+#            'type': 'paragraph'
+#            'id': '928739187243'
+#            'text': "<pre>#{xhr.responseText}"
+#          ]
+#        return whenGotten report, 'local'
+#      if localContext.length > 0
+#        recursiveGet( {pageInformation, whenGotten, whenNotGotten, localContext} )
+#      else
+#        whenNotGotten()
+
+# NeighborNet BEGIN 
+
+
+
+
+
+# NeighborNet END  
+
+
+pageHandler.get = ({whenGotten,whenNotGotten,pageInformation}) ->
 
   unless pageInformation.site
     if localPage = pageFromLocalStorage(pageInformation.slug)

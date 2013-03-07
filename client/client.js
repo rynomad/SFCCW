@@ -1,442 +1,16 @@
-(function(){var require = function (file, cwd) {
-    var resolved = require.resolve(file, cwd || '/');
-    var mod = require.modules[resolved];
-    if (!mod) throw new Error(
-        'Failed to resolve module ' + file + ', tried ' + resolved
-    );
-    var cached = require.cache[resolved];
-    var res = cached? cached.exports : mod();
-    return res;
-};
+;(function(e,t,n,r){function i(r){if(!n[r]){if(!t[r]){if(e)return e(r);throw new Error("Cannot find module '"+r+"'")}var s=n[r]={exports:{}};t[r][0](function(e){var n=t[r][1][e];return i(n?n:e)},s,s.exports)}return n[r].exports}for(var s=0;s<r.length;s++)i(r[s]);return i})(typeof require!=="undefined"&&require,{1:[function(require,module,exports){(function() {
 
-require.paths = [];
-require.modules = {};
-require.cache = {};
-require.extensions = [".js",".coffee",".json"];
+  window.wiki = require('./lib/wiki.coffee');
 
-require._core = {
-    'assert': true,
-    'events': true,
-    'fs': true,
-    'path': true,
-    'vm': true
-};
+  require('./lib/legacy.coffee');
 
-require.resolve = (function () {
-    return function (x, cwd) {
-        if (!cwd) cwd = '/';
-        
-        if (require._core[x]) return x;
-        var path = require.modules.path();
-        cwd = path.resolve('/', cwd);
-        var y = cwd || '/';
-        
-        if (x.match(/^(?:\.\.?\/|\/)/)) {
-            var m = loadAsFileSync(path.resolve(y, x))
-                || loadAsDirectorySync(path.resolve(y, x));
-            if (m) return m;
-        }
-        
-        var n = loadNodeModulesSync(x, y);
-        if (n) return n;
-        
-        throw new Error("Cannot find module '" + x + "'");
-        
-        function loadAsFileSync (x) {
-            x = path.normalize(x);
-            if (require.modules[x]) {
-                return x;
-            }
-            
-            for (var i = 0; i < require.extensions.length; i++) {
-                var ext = require.extensions[i];
-                if (require.modules[x + ext]) return x + ext;
-            }
-        }
-        
-        function loadAsDirectorySync (x) {
-            x = x.replace(/\/+$/, '');
-            var pkgfile = path.normalize(x + '/package.json');
-            if (require.modules[pkgfile]) {
-                var pkg = require.modules[pkgfile]();
-                var b = pkg.browserify;
-                if (typeof b === 'object' && b.main) {
-                    var m = loadAsFileSync(path.resolve(x, b.main));
-                    if (m) return m;
-                }
-                else if (typeof b === 'string') {
-                    var m = loadAsFileSync(path.resolve(x, b));
-                    if (m) return m;
-                }
-                else if (pkg.main) {
-                    var m = loadAsFileSync(path.resolve(x, pkg.main));
-                    if (m) return m;
-                }
-            }
-            
-            return loadAsFileSync(x + '/index');
-        }
-        
-        function loadNodeModulesSync (x, start) {
-            var dirs = nodeModulesPathsSync(start);
-            for (var i = 0; i < dirs.length; i++) {
-                var dir = dirs[i];
-                var m = loadAsFileSync(dir + '/' + x);
-                if (m) return m;
-                var n = loadAsDirectorySync(dir + '/' + x);
-                if (n) return n;
-            }
-            
-            var m = loadAsFileSync(x);
-            if (m) return m;
-        }
-        
-        function nodeModulesPathsSync (start) {
-            var parts;
-            if (start === '/') parts = [ '' ];
-            else parts = path.normalize(start).split('/');
-            
-            var dirs = [];
-            for (var i = parts.length - 1; i >= 0; i--) {
-                if (parts[i] === 'node_modules') continue;
-                var dir = parts.slice(0, i + 1).join('/') + '/node_modules';
-                dirs.push(dir);
-            }
-            
-            return dirs;
-        }
-    };
-})();
+}).call(this);
 
-require.alias = function (from, to) {
-    var path = require.modules.path();
-    var res = null;
-    try {
-        res = require.resolve(from + '/package.json', '/');
-    }
-    catch (err) {
-        res = require.resolve(from, '/');
-    }
-    var basedir = path.dirname(res);
-    
-    var keys = (Object.keys || function (obj) {
-        var res = [];
-        for (var key in obj) res.push(key);
-        return res;
-    })(require.modules);
-    
-    for (var i = 0; i < keys.length; i++) {
-        var key = keys[i];
-        if (key.slice(0, basedir.length + 1) === basedir + '/') {
-            var f = key.slice(basedir.length);
-            require.modules[to + f] = require.modules[basedir + f];
-        }
-        else if (key === basedir) {
-            require.modules[to] = require.modules[basedir];
-        }
-    }
-};
-
-(function () {
-    var process = {};
-    var global = typeof window !== 'undefined' ? window : {};
-    var definedProcess = false;
-    
-    require.define = function (filename, fn) {
-        if (!definedProcess && require.modules.__browserify_process) {
-            process = require.modules.__browserify_process();
-            definedProcess = true;
-        }
-        
-        var dirname = require._core[filename]
-            ? ''
-            : require.modules.path().dirname(filename)
-        ;
-        
-        var require_ = function (file) {
-            var requiredModule = require(file, dirname);
-            var cached = require.cache[require.resolve(file, dirname)];
-
-            if (cached && cached.parent === null) {
-                cached.parent = module_;
-            }
-
-            return requiredModule;
-        };
-        require_.resolve = function (name) {
-            return require.resolve(name, dirname);
-        };
-        require_.modules = require.modules;
-        require_.define = require.define;
-        require_.cache = require.cache;
-        var module_ = {
-            id : filename,
-            filename: filename,
-            exports : {},
-            loaded : false,
-            parent: null
-        };
-        
-        require.modules[filename] = function () {
-            require.cache[filename] = module_;
-            fn.call(
-                module_.exports,
-                require_,
-                module_,
-                module_.exports,
-                dirname,
-                filename,
-                process,
-                global
-            );
-            module_.loaded = true;
-            return module_.exports;
-        };
-    };
-})();
-
-
-require.define("path",function(require,module,exports,__dirname,__filename,process,global){function filter (xs, fn) {
-    var res = [];
-    for (var i = 0; i < xs.length; i++) {
-        if (fn(xs[i], i, xs)) res.push(xs[i]);
-    }
-    return res;
-}
-
-// resolves . and .. elements in a path array with directory names there
-// must be no slashes, empty elements, or device names (c:\) in the array
-// (so also no leading and trailing slashes - it does not distinguish
-// relative and absolute paths)
-function normalizeArray(parts, allowAboveRoot) {
-  // if the path tries to go above the root, `up` ends up > 0
-  var up = 0;
-  for (var i = parts.length; i >= 0; i--) {
-    var last = parts[i];
-    if (last == '.') {
-      parts.splice(i, 1);
-    } else if (last === '..') {
-      parts.splice(i, 1);
-      up++;
-    } else if (up) {
-      parts.splice(i, 1);
-      up--;
-    }
-  }
-
-  // if the path is allowed to go above the root, restore leading ..s
-  if (allowAboveRoot) {
-    for (; up--; up) {
-      parts.unshift('..');
-    }
-  }
-
-  return parts;
-}
-
-// Regex to split a filename into [*, dir, basename, ext]
-// posix version
-var splitPathRe = /^(.+\/(?!$)|\/)?((?:.+?)?(\.[^.]*)?)$/;
-
-// path.resolve([from ...], to)
-// posix version
-exports.resolve = function() {
-var resolvedPath = '',
-    resolvedAbsolute = false;
-
-for (var i = arguments.length; i >= -1 && !resolvedAbsolute; i--) {
-  var path = (i >= 0)
-      ? arguments[i]
-      : process.cwd();
-
-  // Skip empty and invalid entries
-  if (typeof path !== 'string' || !path) {
-    continue;
-  }
-
-  resolvedPath = path + '/' + resolvedPath;
-  resolvedAbsolute = path.charAt(0) === '/';
-}
-
-// At this point the path should be resolved to a full absolute path, but
-// handle relative paths to be safe (might happen when process.cwd() fails)
-
-// Normalize the path
-resolvedPath = normalizeArray(filter(resolvedPath.split('/'), function(p) {
-    return !!p;
-  }), !resolvedAbsolute).join('/');
-
-  return ((resolvedAbsolute ? '/' : '') + resolvedPath) || '.';
-};
-
-// path.normalize(path)
-// posix version
-exports.normalize = function(path) {
-var isAbsolute = path.charAt(0) === '/',
-    trailingSlash = path.slice(-1) === '/';
-
-// Normalize the path
-path = normalizeArray(filter(path.split('/'), function(p) {
-    return !!p;
-  }), !isAbsolute).join('/');
-
-  if (!path && !isAbsolute) {
-    path = '.';
-  }
-  if (path && trailingSlash) {
-    path += '/';
-  }
-  
-  return (isAbsolute ? '/' : '') + path;
-};
-
-
-// posix version
-exports.join = function() {
-  var paths = Array.prototype.slice.call(arguments, 0);
-  return exports.normalize(filter(paths, function(p, index) {
-    return p && typeof p === 'string';
-  }).join('/'));
-};
-
-
-exports.dirname = function(path) {
-  var dir = splitPathRe.exec(path)[1] || '';
-  var isWindows = false;
-  if (!dir) {
-    // No dirname
-    return '.';
-  } else if (dir.length === 1 ||
-      (isWindows && dir.length <= 3 && dir.charAt(1) === ':')) {
-    // It is just a slash or a drive letter with a slash
-    return dir;
-  } else {
-    // It is a full dirname, strip trailing slash
-    return dir.substring(0, dir.length - 1);
-  }
-};
-
-
-exports.basename = function(path, ext) {
-  var f = splitPathRe.exec(path)[2] || '';
-  // TODO: make this comparison case-insensitive on windows?
-  if (ext && f.substr(-1 * ext.length) === ext) {
-    f = f.substr(0, f.length - ext.length);
-  }
-  return f;
-};
-
-
-exports.extname = function(path) {
-  return splitPathRe.exec(path)[3] || '';
-};
-
-exports.relative = function(from, to) {
-  from = exports.resolve(from).substr(1);
-  to = exports.resolve(to).substr(1);
-
-  function trim(arr) {
-    var start = 0;
-    for (; start < arr.length; start++) {
-      if (arr[start] !== '') break;
-    }
-
-    var end = arr.length - 1;
-    for (; end >= 0; end--) {
-      if (arr[end] !== '') break;
-    }
-
-    if (start > end) return [];
-    return arr.slice(start, end - start + 1);
-  }
-
-  var fromParts = trim(from.split('/'));
-  var toParts = trim(to.split('/'));
-
-  var length = Math.min(fromParts.length, toParts.length);
-  var samePartsLength = length;
-  for (var i = 0; i < length; i++) {
-    if (fromParts[i] !== toParts[i]) {
-      samePartsLength = i;
-      break;
-    }
-  }
-
-  var outputParts = [];
-  for (var i = samePartsLength; i < fromParts.length; i++) {
-    outputParts.push('..');
-  }
-
-  outputParts = outputParts.concat(toParts.slice(samePartsLength));
-
-  return outputParts.join('/');
-};
-
-});
-
-require.define("__browserify_process",function(require,module,exports,__dirname,__filename,process,global){var process = module.exports = {};
-
-process.nextTick = (function () {
-    var canSetImmediate = typeof window !== 'undefined'
-        && window.setImmediate;
-    var canPost = typeof window !== 'undefined'
-        && window.postMessage && window.addEventListener
-    ;
-
-    if (canSetImmediate) {
-        return function (f) { return window.setImmediate(f) };
-    }
-
-    if (canPost) {
-        var queue = [];
-        window.addEventListener('message', function (ev) {
-            if (ev.source === window && ev.data === 'browserify-tick') {
-                ev.stopPropagation();
-                if (queue.length > 0) {
-                    var fn = queue.shift();
-                    fn();
-                }
-            }
-        }, true);
-
-        return function nextTick(fn) {
-            queue.push(fn);
-            window.postMessage('browserify-tick', '*');
-        };
-    }
-
-    return function nextTick(fn) {
-        setTimeout(fn, 0);
-    };
-})();
-
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-
-process.binding = function (name) {
-    if (name === 'evals') return (require)('vm')
-    else throw new Error('No such module. (Possibly not yet loaded)')
-};
-
-(function () {
-    var cwd = '/';
-    var path;
-    process.cwd = function () { return cwd };
-    process.chdir = function (dir) {
-        if (!path) path = require('path');
-        cwd = path.resolve(dir, cwd);
-    };
-})();
-
-});
-
-require.define("/client/lib/wiki.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+},{"./lib/wiki.coffee":2,"./lib/legacy.coffee":3}],2:[function(require,module,exports){(function() {
   var createSynopsis, wiki,
     __slice = [].slice;
 
-  createSynopsis = require('./synopsis');
+  createSynopsis = require('./synopsis.coffee');
 
   wiki = {
     createSynopsis: createSynopsis
@@ -529,40 +103,7 @@ require.define("/client/lib/wiki.coffee",function(require,module,exports,__dirna
 
 }).call(this);
 
-});
-
-require.define("/client/lib/synopsis.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
-
-  module.exports = function(page) {
-    var p1, p2, synopsis;
-    synopsis = page.synopsis;
-    if ((page != null) && (page.story != null)) {
-      p1 = page.story[0];
-      p2 = page.story[1];
-      if (p1 && p1.type === 'paragraph') {
-        synopsis || (synopsis = p1.text);
-      }
-      if (p2 && p2.type === 'paragraph') {
-        synopsis || (synopsis = p2.text);
-      }
-      if (p1 && (p1.text != null)) {
-        synopsis || (synopsis = p1.text);
-      }
-      if (p2 && (p2.text != null)) {
-        synopsis || (synopsis = p2.text);
-      }
-      synopsis || (synopsis = (page.story != null) && ("A page with " + page.story.length + " items."));
-    } else {
-      synopsis = 'A page with no story.';
-    }
-    return synopsis;
-  };
-
-}).call(this);
-
-});
-
-require.define("/client/lib/legacy.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+},{"./synopsis.coffee":4}],3:[function(require,module,exports){(function() {
   var active, pageHandler, plugin, refresh, state, util;
 
   util = require('./util.coffee');
@@ -931,9 +472,36 @@ require.define("/client/lib/legacy.coffee",function(require,module,exports,__dir
 
 }).call(this);
 
-});
+},{"./util.coffee":5,"./pageHandler.coffee":6,"./plugin.coffee":7,"./state.coffee":8,"./active.coffee":9,"./refresh.coffee":10}],4:[function(require,module,exports){(function() {
 
-require.define("/client/lib/util.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+  module.exports = function(page) {
+    var p1, p2, synopsis;
+    synopsis = page.synopsis;
+    if ((page != null) && (page.story != null)) {
+      p1 = page.story[0];
+      p2 = page.story[1];
+      if (p1 && p1.type === 'paragraph') {
+        synopsis || (synopsis = p1.text);
+      }
+      if (p2 && p2.type === 'paragraph') {
+        synopsis || (synopsis = p2.text);
+      }
+      if (p1 && (p1.text != null)) {
+        synopsis || (synopsis = p1.text);
+      }
+      if (p2 && (p2.text != null)) {
+        synopsis || (synopsis = p2.text);
+      }
+      synopsis || (synopsis = (page.story != null) && ("A page with " + page.story.length + " items."));
+    } else {
+      synopsis = 'A page with no story.';
+    }
+    return synopsis;
+  };
+
+}).call(this);
+
+},{}],5:[function(require,module,exports){(function() {
   var util;
 
   module.exports = wiki.util = util = {};
@@ -1060,356 +628,7 @@ require.define("/client/lib/util.coffee",function(require,module,exports,__dirna
 
 }).call(this);
 
-});
-
-require.define("/client/lib/pageHandler.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
-  var addToJournal, ndn, pageFromLocalStorage, pageHandler, pushToLocal, pushToServer, revision, state, util;
-
-  util = require('./util');
-
-  state = require('./state');
-
-  revision = require('./revision');
-
-  addToJournal = require('./addToJournal');
-
-  require('../../server/express/public/lib/ndn/ndn.js');
-
-  module.exports = pageHandler = {};
-
-  pageFromLocalStorage = function(slug) {
-    var json;
-    if (json = localStorage[slug]) {
-      return JSON.parse(json);
-    } else {
-      return void 0;
-    }
-  };
-
-  /*
-  
-  recursiveGet = ({pageInformation, whenGotten, whenNotGotten, localContext}) ->
-    {slug,rev,site} = pageInformation
-  
-    if site
-      localContext = []
-    else
-      site = localContext.shift()
-  
-    site = null if site=='view'
-  
-    if site?
-      if site == 'local'
-        if localPage = pageFromLocalStorage(pageInformation.slug)
-          return whenGotten( localPage, 'local' )
-        else
-          return whenNotGotten()
-      else
-        if site == 'origin'
-          url = "/#{slug}.json"
-        else
-          url = "http://#{site}/#{slug}.json"
-    else
-      url = "/#{slug}.json"
-  
-    $.ajax
-      type: 'GET'
-      dataType: 'json'
-      url: url + "?random=#{util.randomBytes(4)}"
-      success: (page) ->
-        page = revision.create rev, page if rev
-        return whenGotten(page,site)
-      error: (xhr, type, msg) ->
-        if (xhr.status != 404) and (xhr.status != 0)
-          wiki.log 'pageHandler.get error', xhr, xhr.status, type, msg
-          report =
-            'title': "#{xhr.status} #{msg}"
-            'story': [
-              'type': 'paragraph'
-              'id': '928739187243'
-              'text': "<pre>#{xhr.responseText}"
-            ]
-          return whenGotten report, 'local'
-        if localContext.length > 0
-          recursiveGet( {pageInformation, whenGotten, whenNotGotten, localContext} )
-        else
-          whenNotGotten()
-  */
-
-
-  /* NeighborNet BEGIN
-  */
-
-
-  ndn = new NDN({
-    host: 'localhost'
-  });
-
-  /*
-  run = () ->
-    name = new Name(document.getElementById('interest').value)
-    content = ndn.expressInterest(name, new ContentClosure(ndn, name, new Interest(name)))
-    # console.log contentObject
-  	
-  display = () ->
-    console.log fullcontent
-  */
-
-
-  /* NeighborNet END
-  */
-
-
-  pageHandler.get = function(_arg) {
-    var localPage, pageInformation, whenGotten, whenNotGotten;
-    whenGotten = _arg.whenGotten, whenNotGotten = _arg.whenNotGotten, pageInformation = _arg.pageInformation;
-    if (!pageInformation.site) {
-      if (localPage = pageFromLocalStorage(pageInformation.slug)) {
-        if (pageInformation.rev) {
-          localPage = revision.create(pageInformation.rev, localPage);
-        }
-        return whenGotten(localPage, 'local');
-      }
-    }
-    if (!pageHandler.context.length) {
-      pageHandler.context = ['view'];
-    }
-    return recursiveGet({
-      pageInformation: pageInformation,
-      whenGotten: whenGotten,
-      whenNotGotten: whenNotGotten,
-      localContext: _.clone(pageHandler.context)
-    });
-  };
-
-  pageHandler.context = [];
-
-  pushToLocal = function(pageElement, pagePutInfo, action) {
-    var page, site;
-    page = pageFromLocalStorage(pagePutInfo.slug);
-    if (action.type === 'create') {
-      page = {
-        title: action.item.title
-      };
-    }
-    page || (page = pageElement.data("data"));
-    if (page.journal == null) {
-      page.journal = [];
-    }
-    if ((site = action['fork']) != null) {
-      page.journal = page.journal.concat({
-        'type': 'fork',
-        'site': site
-      });
-      delete action['fork'];
-    }
-    page.journal = page.journal.concat(action);
-    page.story = $(pageElement).find(".item").map(function() {
-      return $(this).data("item");
-    }).get();
-    localStorage[pagePutInfo.slug] = JSON.stringify(page);
-    return addToJournal(pageElement.find('.journal'), action);
-  };
-
-  pushToServer = function(pageElement, pagePutInfo, action) {
-    return $.ajax({
-      type: 'PUT',
-      url: "/page/" + pagePutInfo.slug + "/action",
-      data: {
-        'action': JSON.stringify(action)
-      },
-      success: function() {
-        addToJournal(pageElement.find('.journal'), action);
-        if (action.type === 'fork') {
-          localStorage.removeItem(pageElement.attr('id'));
-          return state.setUrl;
-        }
-      },
-      error: function(xhr, type, msg) {
-        return wiki.log("pageHandler.put ajax error callback", type, msg);
-      }
-    });
-  };
-
-  pageHandler.put = function(pageElement, action) {
-    var checkedSite, forkFrom, pagePutInfo;
-    checkedSite = function() {
-      var site;
-      switch (site = pageElement.data('site')) {
-        case 'origin':
-        case 'local':
-        case 'view':
-          return null;
-        case location.host:
-          return null;
-        default:
-          return site;
-      }
-    };
-    pagePutInfo = {
-      slug: pageElement.attr('id').split('_rev')[0],
-      rev: pageElement.attr('id').split('_rev')[1],
-      site: checkedSite(),
-      local: pageElement.hasClass('local')
-    };
-    forkFrom = pagePutInfo.site;
-    wiki.log('pageHandler.put', action, pagePutInfo);
-    if (wiki.useLocalStorage()) {
-      if (pagePutInfo.site != null) {
-        wiki.log('remote => local');
-      } else if (!pagePutInfo.local) {
-        wiki.log('origin => local');
-        action.site = forkFrom = location.host;
-      }
-    }
-    action.date = (new Date()).getTime();
-    if (action.site === 'origin') {
-      delete action.site;
-    }
-    if (forkFrom) {
-      pageElement.find('h1 img').attr('src', '/favicon.png');
-      pageElement.find('h1 a').attr('href', '/');
-      pageElement.data('site', null);
-      pageElement.removeClass('remote');
-      state.setUrl();
-      if (action.type !== 'fork') {
-        action.fork = forkFrom;
-        addToJournal(pageElement.find('.journal'), {
-          type: 'fork',
-          site: forkFrom,
-          date: action.date
-        });
-      }
-    }
-    if (wiki.useLocalStorage() || pagePutInfo.site === 'local') {
-      pushToLocal(pageElement, pagePutInfo, action);
-      return pageElement.addClass("local");
-    } else {
-      return pushToServer(pageElement, pagePutInfo, action);
-    }
-  };
-
-}).call(this);
-
-});
-
-require.define("/client/lib/state.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
-  var active, state,
-    __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
-
-  active = require('./active');
-
-  module.exports = state = {};
-
-  state.pagesInDom = function() {
-    return $.makeArray($(".page").map(function(_, el) {
-      return el.id;
-    }));
-  };
-
-  state.urlPages = function() {
-    var i;
-    return ((function() {
-      var _i, _len, _ref, _results;
-      _ref = $(location).attr('pathname').split('/');
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i += 2) {
-        i = _ref[_i];
-        _results.push(i);
-      }
-      return _results;
-    })()).slice(1);
-  };
-
-  state.locsInDom = function() {
-    return $.makeArray($(".page").map(function(_, el) {
-      return $(el).data('site') || 'view';
-    }));
-  };
-
-  state.urlLocs = function() {
-    var j, _i, _len, _ref, _results;
-    _ref = $(location).attr('pathname').split('/').slice(1);
-    _results = [];
-    for (_i = 0, _len = _ref.length; _i < _len; _i += 2) {
-      j = _ref[_i];
-      _results.push(j);
-    }
-    return _results;
-  };
-
-  state.setUrl = function() {
-    var idx, locs, page, pages, url, _ref;
-    document.title = (_ref = $('.page:last').data('data')) != null ? _ref.title : void 0;
-    if (history && history.pushState) {
-      locs = state.locsInDom();
-      pages = state.pagesInDom();
-      url = ((function() {
-        var _i, _len, _results;
-        _results = [];
-        for (idx = _i = 0, _len = pages.length; _i < _len; idx = ++_i) {
-          page = pages[idx];
-          _results.push("/" + ((locs != null ? locs[idx] : void 0) || 'view') + "/" + page);
-        }
-        return _results;
-      })()).join('');
-      if (url !== $(location).attr('pathname')) {
-        return history.pushState(null, null, url);
-      }
-    }
-  };
-
-  state.show = function(e) {
-    var idx, name, newLocs, newPages, old, oldLocs, oldPages, previous, _i, _len, _ref;
-    oldPages = state.pagesInDom();
-    newPages = state.urlPages();
-    oldLocs = state.locsInDom();
-    newLocs = state.urlLocs();
-    if (!location.pathname || location.pathname === '/') {
-      return;
-    }
-    previous = $('.page').eq(0);
-    for (idx = _i = 0, _len = newPages.length; _i < _len; idx = ++_i) {
-      name = newPages[idx];
-      if (name !== oldPages[idx]) {
-        old = $('.page').eq(idx);
-        if (old) {
-          old.remove();
-        }
-        wiki.createPage(name, newLocs[idx]).insertAfter(previous).each(wiki.refresh);
-      }
-      previous = $('.page').eq(idx);
-    }
-    previous.nextAll().remove();
-    active.set($('.page').last());
-    return document.title = (_ref = $('.page:last').data('data')) != null ? _ref.title : void 0;
-  };
-
-  state.first = function() {
-    var firstUrlLocs, firstUrlPages, idx, oldPages, urlPage, _i, _len, _results;
-    state.setUrl();
-    firstUrlPages = state.urlPages();
-    firstUrlLocs = state.urlLocs();
-    oldPages = state.pagesInDom();
-    _results = [];
-    for (idx = _i = 0, _len = firstUrlPages.length; _i < _len; idx = ++_i) {
-      urlPage = firstUrlPages[idx];
-      if (__indexOf.call(oldPages, urlPage) < 0) {
-        if (urlPage !== '') {
-          _results.push(wiki.createPage(urlPage, firstUrlLocs[idx]).appendTo('.main'));
-        } else {
-          _results.push(void 0);
-        }
-      }
-    }
-    return _results;
-  };
-
-}).call(this);
-
-});
-
-require.define("/client/lib/active.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+},{}],9:[function(require,module,exports){(function() {
   var active, findScrollContainer, scrollTo;
 
   module.exports = active = {};
@@ -1464,192 +683,7 @@ require.define("/client/lib/active.coffee",function(require,module,exports,__dir
 
 }).call(this);
 
-});
-
-require.define("/client/lib/revision.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
-  var create;
-
-  create = function(revIndex, data) {
-    var afterIndex, editIndex, itemId, items, journal, journalEntry, removeIndex, revJournal, revStory, revStoryIds, revTitle, storyItem, _i, _j, _k, _len, _len1, _len2, _ref;
-    journal = data.journal;
-    revTitle = data.title;
-    revStory = [];
-    revJournal = journal.slice(0, +(+revIndex) + 1 || 9e9);
-    for (_i = 0, _len = revJournal.length; _i < _len; _i++) {
-      journalEntry = revJournal[_i];
-      revStoryIds = revStory.map(function(storyItem) {
-        return storyItem.id;
-      });
-      switch (journalEntry.type) {
-        case 'create':
-          if (journalEntry.item.title != null) {
-            revTitle = journalEntry.item.title;
-            revStory = journalEntry.item.story || [];
-          }
-          break;
-        case 'add':
-          if ((afterIndex = revStoryIds.indexOf(journalEntry.after)) !== -1) {
-            revStory.splice(afterIndex + 1, 0, journalEntry.item);
-          } else {
-            revStory.push(journalEntry.item);
-          }
-          break;
-        case 'edit':
-          if ((editIndex = revStoryIds.indexOf(journalEntry.id)) !== -1) {
-            revStory.splice(editIndex, 1, journalEntry.item);
-          } else {
-            revStory.push(journalEntry.item);
-          }
-          break;
-        case 'move':
-          items = {};
-          for (_j = 0, _len1 = revStory.length; _j < _len1; _j++) {
-            storyItem = revStory[_j];
-            items[storyItem.id] = storyItem;
-          }
-          revStory = [];
-          _ref = journalEntry.order;
-          for (_k = 0, _len2 = _ref.length; _k < _len2; _k++) {
-            itemId = _ref[_k];
-            if (items[itemId] != null) {
-              revStory.push(items[itemId]);
-            }
-          }
-          break;
-        case 'remove':
-          if ((removeIndex = revStoryIds.indexOf(journalEntry.id)) !== -1) {
-            revStory.splice(removeIndex, 1);
-          }
-      }
-    }
-    return {
-      story: revStory,
-      journal: revJournal,
-      title: revTitle
-    };
-  };
-
-  exports.create = create;
-
-}).call(this);
-
-});
-
-require.define("/client/lib/addToJournal.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
-  var util;
-
-  util = require('./util');
-
-  module.exports = function(journalElement, action) {
-    var actionElement, actionTitle, controls, pageElement, prev;
-    pageElement = journalElement.parents('.page:first');
-    if (action.type === 'edit') {
-      prev = journalElement.find(".edit[data-id=" + (action.id || 0) + "]");
-    }
-    actionTitle = action.type;
-    if (action.date != null) {
-      actionTitle += " " + (util.formatElapsedTime(action.date));
-    }
-    actionElement = $("<a href=\"#\" /> ").addClass("action").addClass(action.type).text(util.symbols[action.type]).attr('title', actionTitle).attr('data-id', action.id || "0").data('action', action);
-    controls = journalElement.children('.control-buttons');
-    if (controls.length > 0) {
-      actionElement.insertBefore(controls);
-    } else {
-      actionElement.appendTo(journalElement);
-    }
-    if (action.type === 'fork' && (action.site != null)) {
-      return actionElement.css("background-image", "url(//" + action.site + "/favicon.png)").attr("href", "//" + action.site + "/" + (pageElement.attr('id')) + ".html").data("site", action.site).data("slug", pageElement.attr('id'));
-    }
-  };
-
-}).call(this);
-
-});
-
-require.define("/server/express/public/lib/ndn/ndn.js",function(require,module,exports,__dirname,__filename,process,global){/**
- * Pollyfill for ECMA forEach spec
- */
- // Production steps of ECMA-262, Edition 5, 15.4.4.18
-// Reference: http://es5.github.com/#x15.4.4.18
-if ( !Array.prototype.forEach ) {
- 
-  Array.prototype.forEach = function forEach( callback, thisArg ) {
- 
-    var T, k;
- 
-    if ( this == null ) {
-      throw new TypeError( "this is null or not defined" );
-    }
- 
-    // 1. Let O be the result of calling ToObject passing the |this| value as the argument.
-    var O = Object(this);
- 
-    // 2. Let lenValue be the result of calling the Get internal method of O with the argument "length".
-    // 3. Let len be ToUint32(lenValue).
-    var len = O.length >>> 0; // Hack to convert O.length to a UInt32
- 
-    // 4. If IsCallable(callback) is false, throw a TypeError exception.
-    // See: http://es5.github.com/#x9.11
-    if ( {}.toString.call(callback) !== "[object Function]" ) {
-      throw new TypeError( callback + " is not a function" );
-    }
- 
-    // 5. If thisArg was supplied, let T be thisArg; else let T be undefined.
-    if ( thisArg ) {
-      T = thisArg;
-    }
- 
-    // 6. Let k be 0
-    k = 0;
- 
-    // 7. Repeat, while k < len
-    while( k < len ) {
- 
-      var kValue;
- 
-      // a. Let Pk be ToString(k).
-      //   This is implicit for LHS operands of the in operator
-      // b. Let kPresent be the result of calling the HasProperty internal method of O with argument Pk.
-      //   This step can be combined with c
-      // c. If kPresent is true, then
-      if ( Object.prototype.hasOwnProperty.call(O, k) ) {
- 
-        // i. Let kValue be the result of calling the Get internal method of O with argument Pk.
-        kValue = O[ k ];
- 
-        // ii. Call the Call internal method of callback with T as the this value and
-        // argument list containing kValue, k, and O.
-        callback.call( T, kValue, k, O );
-      }
-      // d. Increase k by 1.
-      k++;
-    }
-    // 8. return undefined
-  };
-}
-
-(function(fileIncludes){
-	var i = 0;
-	fileIncludes.forEach(function(item, i, array){
-		console.log('###', item);
-		var script = document.createElement('script');
-		script.src = '../lib/ndn/' + item
-		script.type = 'text/javascript';
-		document.head.appendChild(script);
-	});
-})(['ndn-js.js', 'ndn-closures.js', 'ndn-utils.js']);
-
-
-
-
-
-
-
-
-
-});
-
-require.define("/client/lib/plugin.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+},{}],7:[function(require,module,exports){(function() {
   var getScript, plugin, scripts, util;
 
   util = require('./util.coffee');
@@ -1788,9 +822,121 @@ require.define("/client/lib/plugin.coffee",function(require,module,exports,__dir
 
 }).call(this);
 
-});
+},{"./util.coffee":5}],8:[function(require,module,exports){(function() {
+  var active, state,
+    __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
-require.define("/client/lib/refresh.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+  active = require('./active.coffee');
+
+  module.exports = state = {};
+
+  state.pagesInDom = function() {
+    return $.makeArray($(".page").map(function(_, el) {
+      return el.id;
+    }));
+  };
+
+  state.urlPages = function() {
+    var i;
+    return ((function() {
+      var _i, _len, _ref, _results;
+      _ref = $(location).attr('pathname').split('/');
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i += 2) {
+        i = _ref[_i];
+        _results.push(i);
+      }
+      return _results;
+    })()).slice(1);
+  };
+
+  state.locsInDom = function() {
+    return $.makeArray($(".page").map(function(_, el) {
+      return $(el).data('site') || 'view';
+    }));
+  };
+
+  state.urlLocs = function() {
+    var j, _i, _len, _ref, _results;
+    _ref = $(location).attr('pathname').split('/').slice(1);
+    _results = [];
+    for (_i = 0, _len = _ref.length; _i < _len; _i += 2) {
+      j = _ref[_i];
+      _results.push(j);
+    }
+    return _results;
+  };
+
+  state.setUrl = function() {
+    var idx, locs, page, pages, url, _ref;
+    document.title = (_ref = $('.page:last').data('data')) != null ? _ref.title : void 0;
+    if (history && history.pushState) {
+      locs = state.locsInDom();
+      pages = state.pagesInDom();
+      url = ((function() {
+        var _i, _len, _results;
+        _results = [];
+        for (idx = _i = 0, _len = pages.length; _i < _len; idx = ++_i) {
+          page = pages[idx];
+          _results.push("/" + ((locs != null ? locs[idx] : void 0) || 'view') + "/" + page);
+        }
+        return _results;
+      })()).join('');
+      if (url !== $(location).attr('pathname')) {
+        return history.pushState(null, null, url);
+      }
+    }
+  };
+
+  state.show = function(e) {
+    var idx, name, newLocs, newPages, old, oldLocs, oldPages, previous, _i, _len, _ref;
+    oldPages = state.pagesInDom();
+    newPages = state.urlPages();
+    oldLocs = state.locsInDom();
+    newLocs = state.urlLocs();
+    if (!location.pathname || location.pathname === '/') {
+      return;
+    }
+    previous = $('.page').eq(0);
+    for (idx = _i = 0, _len = newPages.length; _i < _len; idx = ++_i) {
+      name = newPages[idx];
+      if (name !== oldPages[idx]) {
+        old = $('.page').eq(idx);
+        if (old) {
+          old.remove();
+        }
+        wiki.createPage(name, newLocs[idx]).insertAfter(previous).each(wiki.refresh);
+      }
+      previous = $('.page').eq(idx);
+    }
+    previous.nextAll().remove();
+    active.set($('.page').last());
+    return document.title = (_ref = $('.page:last').data('data')) != null ? _ref.title : void 0;
+  };
+
+  state.first = function() {
+    var firstUrlLocs, firstUrlPages, idx, oldPages, urlPage, _i, _len, _results;
+    state.setUrl();
+    firstUrlPages = state.urlPages();
+    firstUrlLocs = state.urlLocs();
+    oldPages = state.pagesInDom();
+    _results = [];
+    for (idx = _i = 0, _len = firstUrlPages.length; _i < _len; idx = ++_i) {
+      urlPage = firstUrlPages[idx];
+      if (__indexOf.call(oldPages, urlPage) < 0) {
+        if (urlPage !== '') {
+          _results.push(wiki.createPage(urlPage, firstUrlLocs[idx]).appendTo('.main'));
+        } else {
+          _results.push(void 0);
+        }
+      }
+    }
+    return _results;
+  };
+
+}).call(this);
+
+},{"./active.coffee":9}],10:[function(require,module,exports){(function() {
   var addToJournal, buildPageHeader, createFactory, emitHeader, emitTwins, handleDragging, initAddButton, initDragging, neighborhood, pageHandler, plugin, refresh, renderPageIntoPageElement, state, util, wiki,
     __slice = [].slice;
 
@@ -1804,9 +950,9 @@ require.define("/client/lib/refresh.coffee",function(require,module,exports,__di
 
   neighborhood = require('./neighborhood.coffee');
 
-  addToJournal = require('./addToJournal');
+  addToJournal = require('./addToJournal.coffee');
 
-  wiki = require('./wiki');
+  wiki = require('./wiki.coffee');
 
   handleDragging = function(evt, ui) {
     var action, before, beforeElement, destinationPageElement, equals, item, itemElement, moveFromPage, moveToPage, moveWithinPage, order, sourcePageElement, sourceSite, thisPageElement;
@@ -2148,9 +1294,509 @@ require.define("/client/lib/refresh.coffee",function(require,module,exports,__di
 
 }).call(this);
 
-});
+},{"./util.coffee":5,"./pageHandler.coffee":6,"./plugin.coffee":7,"./state.coffee":8,"./neighborhood.coffee":11,"./addToJournal.coffee":12,"./wiki.coffee":2}],6:[function(require,module,exports){(function() {
+  var addToJournal, ndnClosures, pageFromLocalStorage, pageHandler, pushToLocal, pushToServer, recursiveGet, revision, state, step, util;
 
-require.define("/client/lib/neighborhood.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+  util = require('./util.coffee');
+
+  state = require('./state.coffee');
+
+  revision = require('./revision.coffee');
+
+  addToJournal = require('./addToJournal.coffee');
+
+  step = require('step');
+
+  ndnClosures = require('./ndnClosures');
+
+  module.exports = pageHandler = {};
+
+  pageFromLocalStorage = function(slug) {
+    var json;
+    if (json = localStorage[slug]) {
+      return JSON.parse(json);
+    } else {
+      return void 0;
+    }
+  };
+
+  recursiveGet = function(_arg) {
+    var closure, interest, localContext, localPage, name, ndn, page, pageInformation, rev, site, slug, url, whenGotten, whenNotGotten;
+    pageInformation = _arg.pageInformation, whenGotten = _arg.whenGotten, whenNotGotten = _arg.whenNotGotten, localContext = _arg.localContext;
+    slug = pageInformation.slug, rev = pageInformation.rev, site = pageInformation.site;
+    if (site) {
+      localContext = [];
+    } else {
+      site = localContext.shift();
+    }
+    if (site === 'view') {
+      site = null;
+    }
+    if (site != null) {
+      if (site === 'local') {
+        if (localPage = pageFromLocalStorage(pageInformation.slug)) {
+          return whenGotten(localPage, 'local');
+        } else {
+          return whenNotGotten();
+        }
+      } else {
+        if (site === 'origin') {
+          url = "/" + slug + ".json";
+        } else {
+          url = "http://" + site + "/" + slug + ".json";
+        }
+      }
+    } else {
+      url = "/" + slug + ".json";
+    }
+    ndn = new NDN({
+      host: 'localhost'
+    });
+    name = new Name('/sfw' + url);
+    interest = new Interest(name);
+    closure = new ContentClosure(ndn, name, interest);
+    ndn.expressInterest(name, closure);
+    alert("this is a sanity check to see if I've fucked anything up in the last 12 hours");
+    alert(closure.fullcontent);
+    page = JSON.parse(closure.fullcontent);
+    return whenGotten(page, site);
+  };
+
+  pageHandler.get = function(_arg) {
+    var localPage, pageInformation, whenGotten, whenNotGotten;
+    whenGotten = _arg.whenGotten, whenNotGotten = _arg.whenNotGotten, pageInformation = _arg.pageInformation;
+    if (!pageInformation.site) {
+      if (localPage = pageFromLocalStorage(pageInformation.slug)) {
+        if (pageInformation.rev) {
+          localPage = revision.create(pageInformation.rev, localPage);
+        }
+        return whenGotten(localPage, 'local');
+      }
+    }
+    if (!pageHandler.context.length) {
+      pageHandler.context = ['view'];
+    }
+    return recursiveGet({
+      pageInformation: pageInformation,
+      whenGotten: whenGotten,
+      whenNotGotten: whenNotGotten,
+      localContext: _.clone(pageHandler.context)
+    });
+  };
+
+  pageHandler.context = [];
+
+  pushToLocal = function(pageElement, pagePutInfo, action) {
+    var page, site;
+    page = pageFromLocalStorage(pagePutInfo.slug);
+    if (action.type === 'create') {
+      page = {
+        title: action.item.title
+      };
+    }
+    page || (page = pageElement.data("data"));
+    if (page.journal == null) {
+      page.journal = [];
+    }
+    if ((site = action['fork']) != null) {
+      page.journal = page.journal.concat({
+        'type': 'fork',
+        'site': site
+      });
+      delete action['fork'];
+    }
+    page.journal = page.journal.concat(action);
+    page.story = $(pageElement).find(".item").map(function() {
+      return $(this).data("item");
+    }).get();
+    localStorage[pagePutInfo.slug] = JSON.stringify(page);
+    return addToJournal(pageElement.find('.journal'), action);
+  };
+
+  pushToServer = function(pageElement, pagePutInfo, action) {
+    return $.ajax({
+      type: 'PUT',
+      url: "/page/" + pagePutInfo.slug + "/action",
+      data: {
+        'action': JSON.stringify(action)
+      },
+      success: function() {
+        addToJournal(pageElement.find('.journal'), action);
+        if (action.type === 'fork') {
+          localStorage.removeItem(pageElement.attr('id'));
+          return state.setUrl;
+        }
+      },
+      error: function(xhr, type, msg) {
+        return wiki.log("pageHandler.put ajax error callback", type, msg);
+      }
+    });
+  };
+
+  pageHandler.put = function(pageElement, action) {
+    var checkedSite, forkFrom, pagePutInfo;
+    checkedSite = function() {
+      var site;
+      switch (site = pageElement.data('site')) {
+        case 'origin':
+        case 'local':
+        case 'view':
+          return null;
+        case location.host:
+          return null;
+        default:
+          return site;
+      }
+    };
+    pagePutInfo = {
+      slug: pageElement.attr('id').split('_rev')[0],
+      rev: pageElement.attr('id').split('_rev')[1],
+      site: checkedSite(),
+      local: pageElement.hasClass('local')
+    };
+    forkFrom = pagePutInfo.site;
+    wiki.log('pageHandler.put', action, pagePutInfo);
+    if (wiki.useLocalStorage()) {
+      if (pagePutInfo.site != null) {
+        wiki.log('remote => local');
+      } else if (!pagePutInfo.local) {
+        wiki.log('origin => local');
+        action.site = forkFrom = location.host;
+      }
+    }
+    action.date = (new Date()).getTime();
+    if (action.site === 'origin') {
+      delete action.site;
+    }
+    if (forkFrom) {
+      pageElement.find('h1 img').attr('src', '/favicon.png');
+      pageElement.find('h1 a').attr('href', '/');
+      pageElement.data('site', null);
+      pageElement.removeClass('remote');
+      state.setUrl();
+      if (action.type !== 'fork') {
+        action.fork = forkFrom;
+        addToJournal(pageElement.find('.journal'), {
+          type: 'fork',
+          site: forkFrom,
+          date: action.date
+        });
+      }
+    }
+    if (wiki.useLocalStorage() || pagePutInfo.site === 'local') {
+      pushToLocal(pageElement, pagePutInfo, action);
+      return pageElement.addClass("local");
+    } else {
+      return pushToServer(pageElement, pagePutInfo, action);
+    }
+  };
+
+}).call(this);
+
+},{"./util.coffee":5,"./state.coffee":8,"./revision.coffee":13,"./addToJournal.coffee":12,"./ndnClosures":14,"step":15}],13:[function(require,module,exports){(function() {
+  var create;
+
+  create = function(revIndex, data) {
+    var afterIndex, editIndex, itemId, items, journal, journalEntry, removeIndex, revJournal, revStory, revStoryIds, revTitle, storyItem, _i, _j, _k, _len, _len1, _len2, _ref;
+    journal = data.journal;
+    revTitle = data.title;
+    revStory = [];
+    revJournal = journal.slice(0, +(+revIndex) + 1 || 9e9);
+    for (_i = 0, _len = revJournal.length; _i < _len; _i++) {
+      journalEntry = revJournal[_i];
+      revStoryIds = revStory.map(function(storyItem) {
+        return storyItem.id;
+      });
+      switch (journalEntry.type) {
+        case 'create':
+          if (journalEntry.item.title != null) {
+            revTitle = journalEntry.item.title;
+            revStory = journalEntry.item.story || [];
+          }
+          break;
+        case 'add':
+          if ((afterIndex = revStoryIds.indexOf(journalEntry.after)) !== -1) {
+            revStory.splice(afterIndex + 1, 0, journalEntry.item);
+          } else {
+            revStory.push(journalEntry.item);
+          }
+          break;
+        case 'edit':
+          if ((editIndex = revStoryIds.indexOf(journalEntry.id)) !== -1) {
+            revStory.splice(editIndex, 1, journalEntry.item);
+          } else {
+            revStory.push(journalEntry.item);
+          }
+          break;
+        case 'move':
+          items = {};
+          for (_j = 0, _len1 = revStory.length; _j < _len1; _j++) {
+            storyItem = revStory[_j];
+            items[storyItem.id] = storyItem;
+          }
+          revStory = [];
+          _ref = journalEntry.order;
+          for (_k = 0, _len2 = _ref.length; _k < _len2; _k++) {
+            itemId = _ref[_k];
+            if (items[itemId] != null) {
+              revStory.push(items[itemId]);
+            }
+          }
+          break;
+        case 'remove':
+          if ((removeIndex = revStoryIds.indexOf(journalEntry.id)) !== -1) {
+            revStory.splice(removeIndex, 1);
+          }
+      }
+    }
+    return {
+      story: revStory,
+      journal: revJournal,
+      title: revTitle
+    };
+  };
+
+  exports.create = create;
+
+}).call(this);
+
+},{}],16:[function(require,module,exports){// shim for using process in browser
+
+var process = module.exports = {};
+
+process.nextTick = (function () {
+    var canSetImmediate = typeof window !== 'undefined'
+    && window.setImmediate;
+    var canPost = typeof window !== 'undefined'
+    && window.postMessage && window.addEventListener
+    ;
+
+    if (canSetImmediate) {
+        return function (f) { return window.setImmediate(f) };
+    }
+
+    if (canPost) {
+        var queue = [];
+        window.addEventListener('message', function (ev) {
+            if (ev.source === window && ev.data === 'process-tick') {
+                ev.stopPropagation();
+                if (queue.length > 0) {
+                    var fn = queue.shift();
+                    fn();
+                }
+            }
+        }, true);
+
+        return function nextTick(fn) {
+            queue.push(fn);
+            window.postMessage('process-tick', '*');
+        };
+    }
+
+    return function nextTick(fn) {
+        setTimeout(fn, 0);
+    };
+})();
+
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+}
+
+// TODO(shtylman)
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+
+},{}],15:[function(require,module,exports){(function(process){/*
+Copyright (c) 2011 Tim Caswell <tim@creationix.com>
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+// Inspired by http://github.com/willconant/flow-js, but reimplemented and
+// modified to fit my taste and the node.JS error handling system.
+function Step() {
+  var steps = Array.prototype.slice.call(arguments),
+      pending, counter, results, lock;
+
+  // Define the main callback that's given as `this` to the steps.
+  function next() {
+    counter = pending = 0;
+
+    // Check if there are no steps left
+    if (steps.length === 0) {
+      // Throw uncaught errors
+      if (arguments[0]) {
+        throw arguments[0];
+      }
+      return;
+    }
+
+    // Get the next step to execute
+    var fn = steps.shift();
+    results = [];
+
+    // Run the step in a try..catch block so exceptions don't get out of hand.
+    try {
+      lock = true;
+      var result = fn.apply(next, arguments);
+    } catch (e) {
+      // Pass any exceptions on through the next callback
+      next(e);
+    }
+
+    if (counter > 0 && pending == 0) {
+      // If parallel() was called, and all parallel branches executed
+      // syncronously, go on to the next step immediately.
+      next.apply(null, results);
+    } else if (result !== undefined) {
+      // If a syncronous return is used, pass it to the callback
+      next(undefined, result);
+    }
+    lock = false;
+  }
+
+  // Add a special callback generator `this.parallel()` that groups stuff.
+  next.parallel = function () {
+    var index = 1 + counter++;
+    pending++;
+
+    return function () {
+      pending--;
+      // Compress the error from any result to the first argument
+      if (arguments[0]) {
+        results[0] = arguments[0];
+      }
+      // Send the other results as arguments
+      results[index] = arguments[1];
+      if (!lock && pending === 0) {
+        // When all parallel branches done, call the callback
+        next.apply(null, results);
+      }
+    };
+  };
+
+  // Generates a callback generator for grouped results
+  next.group = function () {
+    var localCallback = next.parallel();
+    var counter = 0;
+    var pending = 0;
+    var result = [];
+    var error = undefined;
+
+    function check() {
+      if (pending === 0) {
+        // When group is done, call the callback
+        localCallback(error, result);
+      }
+    }
+    process.nextTick(check); // Ensures that check is called at least once
+
+    // Generates a callback for the group
+    return function () {
+      var index = counter++;
+      pending++;
+      return function () {
+        pending--;
+        // Compress the error from any result to the first argument
+        if (arguments[0]) {
+          error = arguments[0];
+        }
+        // Send the other results as arguments
+        result[index] = arguments[1];
+        if (!lock) { check(); }
+      };
+    };
+  };
+
+  // Start the engine an pass nothing to the first step.
+  next();
+}
+
+// Tack on leading and tailing steps for input and output and return
+// the whole thing as a function.  Basically turns step calls into function
+// factories.
+Step.fn = function StepFn() {
+  var steps = Array.prototype.slice.call(arguments);
+  return function () {
+    var args = Array.prototype.slice.call(arguments);
+
+    // Insert a first step that primes the data stream
+    var toRun = [function () {
+      this.apply(null, args);
+    }].concat(steps);
+
+    // If the last arg is a function add it as a last step
+    if (typeof args[args.length-1] === 'function') {
+      toRun.push(args.pop());
+    }
+
+
+    Step.apply(null, toRun);
+  }
+}
+
+
+// Hook into commonJS module systems
+if (typeof module !== 'undefined' && "exports" in module) {
+  module.exports = Step;
+}
+
+})(require("__browserify_process"))
+},{"__browserify_process":16}],12:[function(require,module,exports){(function() {
+  var util;
+
+  util = require('./util.coffee');
+
+  module.exports = function(journalElement, action) {
+    var actionElement, actionTitle, controls, pageElement, prev;
+    pageElement = journalElement.parents('.page:first');
+    if (action.type === 'edit') {
+      prev = journalElement.find(".edit[data-id=" + (action.id || 0) + "]");
+    }
+    actionTitle = action.type;
+    if (action.date != null) {
+      actionTitle += " " + (util.formatElapsedTime(action.date));
+    }
+    actionElement = $("<a href=\"#\" /> ").addClass("action").addClass(action.type).text(util.symbols[action.type]).attr('title', actionTitle).attr('data-id', action.id || "0").data('action', action);
+    controls = journalElement.children('.control-buttons');
+    if (controls.length > 0) {
+      actionElement.insertBefore(controls);
+    } else {
+      actionElement.appendTo(journalElement);
+    }
+    if (action.type === 'fork' && (action.site != null)) {
+      return actionElement.css("background-image", "url(//" + action.site + "/favicon.png)").attr("href", "//" + action.site + "/" + (pageElement.attr('id')) + ".html").data("site", action.site).data("slug", pageElement.attr('id'));
+    }
+  };
+
+}).call(this);
+
+},{"./util.coffee":5}],11:[function(require,module,exports){(function() {
   var active, createSearch, neighborhood, nextAvailableFetch, nextFetchInterval, populateSiteInfoFor, util, _ref,
     __hasProp = {}.hasOwnProperty;
 
@@ -2298,14 +1944,456 @@ require.define("/client/lib/neighborhood.coffee",function(require,module,exports
 
 }).call(this);
 
-});
+},{"./active.coffee":9,"./util.coffee":5,"./search.coffee":17}],14:[function(require,module,exports){/*
+ * @author: Jeff Thompson
+ * See COPYING for copyright and distribution information.
+ * This is the ndn protocol handler.
+ * Protocol handling code derived from http://mike.kaply.com/2011/01/18/writing-a-firefox-protocol-handler/
+ */
 
-require.define("/client/lib/search.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
+/*
+ * Create a closure for calling expressInterest.
+ * contentListener is from the call to requestContent.
+ * uriName is the name in the URI passed to newChannel (used in part to determine whether to request 
+ *   only that segment number and for updating the URL bar).
+ * aURI is the URI passed to newChannel.
+ * uriSearchAndHash is the search and hash part of the URI passed to newChannel, including the '?'
+ *    and/or '#' but without the interest selector fields.
+ * segmentTemplate is the template used in expressInterest to fetch further segments.
+ * The uses ExponentialReExpressClosure in expressInterest to re-express if fetching a segment times out.
+ */                                                
+var ContentClosure = function ContentClosure
+      (ndn, name, segmentTemplate, site) {
+    // Inherit from Closure.
+    Closure.call(this);
+    
+    this.ndn = ndn;
+    this.name = name;
+    this.segmentTemplate = segmentTemplate;
+
+
+
+    this.segmentStore = new SegmentStore();
+    this.contentSha256 = new Sha256();
+    this.didRequestFinalSegment = false;
+    this.finalSegmentNumber = null;
+    this.didOnStart = false;
+    this.uriEndsWithSegmentNumber = endsWithSegmentNumber(name.to_uri());
+    this.done = false;
+
+    this.fullcontent = '';
+    this.site = site
+};
+
+ContentClosure.prototype.upcall = function(kind, upcallInfo) {
+  try {
+
+      
+    if (!(kind == Closure.UPCALL_CONTENT ||
+          kind == Closure.UPCALL_CONTENT_UNVERIFIED))
+        // The upcall is not for us.
+        return Closure.RESULT_ERR;
+        
+    var contentObject = upcallInfo.contentObject;
+
+   
+
+
+    if (contentObject.content == null) {
+        dump("NdnProtocol.ContentClosure: contentObject.content is null\n");
+        return Closure.RESULT_ERR;
+    }
+    
+    // If !this.uriEndsWithSegmentNumber, we use the segmentNumber to load multiple segments.
+    // If this.uriEndsWithSegmentNumber, then we leave segmentNumber null.
+    var segmentNumber = null;
+    if (!this.uriEndsWithSegmentNumber && endsWithSegmentNumber(contentObject.name)) {
+        segmentNumber = DataUtils.bigEndianToUnsignedInt
+            (contentObject.name.components[contentObject.name.components.length - 1]);
+        this.segmentStore.storeContent(segmentNumber, contentObject);
+    }
+    
+    if ((segmentNumber == null || segmentNumber == 0) && !this.didOnStart) {
+        // This is the first or only segment.
+        /* TODO: Finish implementing check for META.
+        var iMetaComponent = getIndexOfMetaComponent(contentObject.name);
+        if (!this.uriEndsWithSegmentNumber && iMetaComponent >= 0 &&
+            getIndexOfMetaComponent(this.uriName) < 0) {
+            // The matched content name has a META component that wasn't requiested in the original
+            //   URI.  Try to exclude the META component to get the "real" content.
+            var nameWithoutMeta = new Name(contentObject.name.components.slice(0, iMetaComponent));
+            var excludeMetaTemplate = this.segmentTemplate.clone();
+            excludeMetaTemplate.exclude = new Exclude([MetaComponentPrefix, Exclude.ANY]);
+            
+            this.ndn.expressInterest
+                (nameWithoutMeta, new ExponentialReExpressClosure(this), excludeMetaTemplate);
+        }
+        */
+        
+
+        console.log('segmentNumber: ', segmentNumber);
+
+
+        this.didOnStart = true;
+        
+        // Get the URI from the ContentObject including the version.
+        var contentUriSpec;
+        if (!this.uriEndsWithSegmentNumber && endsWithSegmentNumber(contentObject.name)) {
+            var nameWithoutSegmentNumber = new Name
+                (contentObject.name.components.slice(0, contentObject.name.components.length - 1));
+            contentUriSpec = nameWithoutSegmentNumber.to_uri();
+            console.log(contentUriSpec + ' 1');
+        }
+        else
+            contentUriSpec = contentObject.name.to_uri();
+    
+        
+        console.log('contentUriSpec', contentUriSpec);
+
+
+        var contentTypeEtc = getNameContentTypeAndCharset(contentObject.name);
+        
+        this.contentTypeEtc = contentTypeEtc
+
+        console.log('contentTypeEtc', contentTypeEtc);
+
+
+    }
+
+    if (segmentNumber == null) {
+        // We are not doing segments, so just finish.
+        console.log('no segments');
+        
+        this.contentListener.onReceivedContent(DataUtils.toString(contentObject.content));
+        this.contentSha256.update(contentObject.content);
+        this.contentListener.onStop();
+
+
+        if (!this.uriEndsWithSegmentNumber) {
+            var nameContentDigest = contentObject.name.getContentDigestValue();
+            if (nameContentDigest != null &&
+                !DataUtils.arraysEqual(nameContentDigest, this.contentSha256.finalize()))
+                // TODO: How to show the user an error for invalid digest?
+                dump("Content does not match digest in name " + contentObject.name.to_uri());
+        }
+        return Closure.RESULT_OK;
+    }
+    
+    if (contentObject.signedInfo != null && contentObject.signedInfo.finalBlockID != null) {
+        console.log('final segment number: ' + contentObject.signedInfo.finalBlockID);
+        this.finalSegmentNumber = DataUtils.bigEndianToUnsignedInt(contentObject.signedInfo.finalBlockID);
+    }
+    // The content was already put in the store.  Retrieve as much as possible.
+    var entry;
+    console.log('entry defined');
+    while ((entry = this.segmentStore.maybeRetrieveNextEntry()) != null) {
+        segmentNumber = entry.key;
+        contentObject = entry.value;
+
+        this.fullcontent += DataUtils.toString(contentObject.content);
+
+        console.log('retrieving segmentNumber ', segmentNumber);
+
+
+        this.contentSha256.update(contentObject.content);
+
+        console.log(this.finalSegmentNumber);
+        
+        if (this.finalSegmentNumber != null && segmentNumber == this.finalSegmentNumber) {
+            // Finished.
+            console.log('finished');
+            console.log('segmentNumber === this.finalSegmentNumber:', segmentNumber === this.finalSegmentNumber);
+            var nameContentDigest = contentObject.name.getContentDigestValue();
+            if (nameContentDigest != null &&
+                !DataUtils.arraysEqual(nameContentDigest, this.contentSha256.finalize()))
+                // TODO: How to show the user an error for invalid digest?
+                dump("Content does not match digest in name " + contentObject.name.to_uri());
+            this.done = true;
+            console.log('kinda hungry');
+            console.log(this.fullcontent);
+            return Closure.RESULT_OK;
+        }
+    }
+
+    console.log('not finished yet');
+
+    if (this.finalSegmentNumber == null && !this.didRequestFinalSegment) {
+        this.didRequestFinalSegment = true;
+
+        // Try to determine the final segment now.
+        var components = contentObject.name.components.slice
+            (0, contentObject.name.components.length );
+        console.log('components = ' + DataUtils.toString(components[3]));
+
+        // Clone the template to set the childSelector.
+        var childSelectorTemplate = this.segmentTemplate.clone();
+        childSelectorTemplate.childSelector = 1;
+        console.log('set childselector');
+        this.ndn.expressInterest
+            (new Name(components), new ExponentialReExpressClosure(this), childSelectorTemplate);
+        console.log('requested final segment');
+    }
+
+    // Request new segments.
+    var toRequest = this.segmentStore.requestSegmentNumbers(2);
+    for (var i = 0; i < toRequest.length; ++i) {
+        if (this.finalSegmentNumber != null && toRequest[i] > this.finalSegmentNumber)
+            continue;
+        
+        this.ndn.expressInterest
+            (new Name(contentObject.name.components.slice
+                      (0, contentObject.name.components.length - 1)).addSegment(toRequest[i]), 
+             new ExponentialReExpressClosure(this), this.segmentTemplate);
+        console.log('requesting new segment')
+    }
+    console.log('closure worked!');
+    
+    return Closure.RESULT_OK;
+  } catch (ex) {
+        dump("ContentClosure.upcall exception: " + ex + "\n" + ex.stack);
+        return Closure.RESULT_ERR;
+  }
+
+};
+
+/*
+ * A SegmentStore stores segments until they are retrieved in order starting with segment 0.
+ */
+var SegmentStore = function SegmentStore() {
+    // Each entry is an object where the key is the segment number and value is null if
+    //   the segment number is requested or the contentObject if received.
+    this.store = new SortedArray();
+    this.maxRetrievedSegmentNumber = -1;
+};
+
+SegmentStore.prototype.storeContent = function(segmentNumber, contentObject) {
+    // We don't expect to try to store a segment that has already been retrieved, but check anyway.
+    if (segmentNumber > this.maxRetrievedSegmentNumber)
+        this.store.set(segmentNumber, contentObject);
+};
+
+/*
+ * If the min segment number is this.maxRetrievedSegmentNumber + 1 and its value is not null, 
+ *   then delete from the store, return the entry with key and value, and update maxRetrievedSegmentNumber.  
+ * Otherwise return null.
+ */
+SegmentStore.prototype.maybeRetrieveNextEntry = function() {
+    if (this.store.entries.length > 0 && this.store.entries[0].value != null &&
+        this.store.entries[0].key == this.maxRetrievedSegmentNumber + 1) {
+        var entry = this.store.entries[0];
+        this.store.removeAt(0);
+        ++this.maxRetrievedSegmentNumber;
+        return entry;
+    }
+    else
+        return null;
+};
+
+/*
+ * Return an array of the next segment numbers that need to be requested so that the total
+ *   requested segments is totalRequestedSegments.  If a segment store entry value is null, it is
+ *   already requested and is not returned.  If a segment number is returned, create a
+ *   entry in the segment store with a null value.
+ */
+SegmentStore.prototype.requestSegmentNumbers = function(totalRequestedSegments) {
+    // First, count how many are already requested.
+    var nRequestedSegments = 0;
+    for (var i = 0; i < this.store.entries.length; ++i) {
+        if (this.store.entries[i].value == null) {
+            ++nRequestedSegments;
+            if (nRequestedSegments >= totalRequestedSegments)
+                // Already maxed out on requests.
+                return [];
+        }
+    }
+    
+    var toRequest = [];
+    var nextSegmentNumber = this.maxRetrievedSegmentNumber + 1;
+    for (var i = 0; i < this.store.entries.length; ++i) {
+        var entry = this.store.entries[i];
+        // Fill in the gap before the segment number in the entry.
+        while (nextSegmentNumber < entry.key) {
+            toRequest.push(nextSegmentNumber);
+            ++nextSegmentNumber;
+            ++nRequestedSegments;
+            if (nRequestedSegments >= totalRequestedSegments)
+                break;
+        }
+        if (nRequestedSegments >= totalRequestedSegments)
+            break;
+        
+        nextSegmentNumber = entry.key + 1;
+    }
+    
+    // We already filled in the gaps for the segments in the store. Continue after the last.
+    while (nRequestedSegments < totalRequestedSegments) {
+        toRequest.push(nextSegmentNumber);
+        ++nextSegmentNumber;
+        ++nRequestedSegments;
+    }
+    
+    // Mark the new segment numbers as requested.
+    for (var i = 0; i < toRequest.length; ++i)
+        this.store.set(toRequest[i], null);
+    return toRequest;
+}
+
+/*
+ * A SortedArray is an array of objects with key and value, where the key is an integer.
+ */
+var SortedArray = function SortedArray() {
+    this.entries = [];
+}
+
+SortedArray.prototype.sortEntries = function() {
+    this.entries.sort(function(a, b) { return a.key - b.key; });
+};
+
+SortedArray.prototype.indexOfKey = function(key) {
+    for (var i = 0; i < this.entries.length; ++i) {
+        if (this.entries[i].key == key)
+            return i;
+    }
+
+    return -1;
+}
+
+SortedArray.prototype.set = function(key, value) {
+    var i = this.indexOfKey(key);
+    if (i >= 0) {
+        this.entries[i].value = value;
+        return;
+    }
+    
+    this.entries.push({ key: key, value: value});
+    this.sortEntries();
+}
+
+SortedArray.prototype.removeAt = function(index) {
+    this.entries.splice(index, 1);
+}
+
+/*
+ * Scan the name from the last component to the first (skipping special name components)
+ *   for a recognized file name extension, and return an object with properties contentType and charset.
+ */
+function getNameContentTypeAndCharset(name) {
+    var iFileName = name.indexOfFileName();
+    console.log(iFileName);
+    if (iFileName < 0)
+        // Get the default mime type.
+        return MimeTypes.getContentTypeAndCharset("");
+
+    console.log(MimeTypes.getContentTypeAndCharset
+        (DataUtils.toString(name.components[iFileName]).toLowerCase()));
+    
+    
+    return MimeTypes.getContentTypeAndCharset
+        (DataUtils.toString(name.components[iFileName]).toLowerCase());
+}
+
+/*
+ * Return true if the last component in the name is a segment number..
+ */
+function endsWithSegmentNumber(name) {
+    return name.components != null && name.components.length >= 1 &&
+        name.components[name.components.length - 1].length >= 1 &&
+        name.components[name.components.length - 1][0] == 0;
+}
+
+/*
+ * Find all search keys starting with "ndn." and set the attribute in template.
+ * Return the search string including the starting "?" but with the "ndn." keys removed,
+ *   or return "" if there are no search terms left.
+ */
+function extractNdnSearch(search, template) {
+    if (!(search.length >= 1 && search[0] == '?'))
+        return search;
+    
+    var terms = search.substr(1).split('&');
+    var i = 0;
+    while (i < terms.length) {
+        var keyValue = terms[i].split('=');
+        var key = keyValue[0].trim();
+        if (key.substr(0, 4) == "ndn.") {
+            if (keyValue.length >= 1) {
+                var value = keyValue[1].trim();
+                var nonNegativeInt = parseInt(value);
+                
+                if (key == "ndn.MinSuffixComponents" && nonNegativeInt >= 0)
+                    template.minSuffixComponents = nonNegativeInt;
+                else if (key == "ndn.MaxSuffixComponents" && nonNegativeInt >= 0)
+                    template.maxSuffixComponents = nonNegativeInt;
+                else if (key == "ndn.ChildSelector" && nonNegativeInt >= 0)
+                    template.childSelector = nonNegativeInt;
+                else if (key == "ndn.AnswerOriginKind" && nonNegativeInt >= 0)
+                    template.answerOriginKind = nonNegativeInt;
+                else if (key == "ndn.Scope" && nonNegativeInt >= 0)
+                    template.scope = nonNegativeInt;
+                else if (key == "ndn.InterestLifetime" && nonNegativeInt >= 0)
+                    template.interestLifetime = nonNegativeInt;
+                else if (key == "ndn.PublisherPublicKeyDigest")
+                    template.publisherPublicKeyDigest = DataUtils.toNumbersFromString(unescape(value));
+                else if (key == "ndn.Nonce")
+                    template.nonce = DataUtils.toNumbersFromString(unescape(value));
+                else if (key == "ndn.Exclude")
+                    template.exclude = parseExclude(value);
+            }
+        
+            // Remove the "ndn." term and don't advance i.
+            terms.splice(i, 1);
+        }
+        else
+            ++i;
+    }
+    
+    if (terms.length == 0)
+        return "";
+    else
+        return "?" + terms.join('&');
+}
+
+/*
+ * Parse the comma-separated list of exclude components and return an Exclude. 
+ */
+function parseExclude(value) {
+    var excludeValues = [];
+    
+    var splitValue = value.split(',');
+    for (var i = 0; i < splitValue.length; ++i) {
+        var element = splitValue[i].trim();
+        if (element == "*")
+            excludeValues.push(Exclude.ANY)
+        else
+            excludeValues.push(Name.fromEscapedString(element));
+    }
+
+    return new Exclude(excludeValues);
+}
+
+/*
+ * Return the index of the first compoment that starts with %C1.META, or -1 if not found.
+ */
+function getIndexOfMetaComponent(name) {
+    for (var i = 0; i < name.components.length; ++i) {
+        var component = name.components[i];
+        if (component.length >= MetaComponentPrefix.length &&
+            DataUtils.arraysEqual(component.subarray(0, MetaComponentPrefix.length), 
+                                  MetaComponentPrefix))
+            return i;
+    }
+    
+    return -1;
+}
+
+var MetaComponentPrefix = new Uint8Array([0xc1, 0x2e, 0x4d, 0x45, 0x54, 0x41]);
+
+},{}],17:[function(require,module,exports){(function() {
   var active, createSearch, util;
 
-  util = require('./util');
+  util = require('./util.coffee');
 
-  active = require('./active');
+  active = require('./active.coffee');
 
   createSearch = function(_arg) {
     var neighborhood, performSearch;
@@ -2354,16 +2442,4 @@ require.define("/client/lib/search.coffee",function(require,module,exports,__dir
 
 }).call(this);
 
-});
-
-require.define("/client/client.coffee",function(require,module,exports,__dirname,__filename,process,global){(function() {
-
-  window.wiki = require('./lib/wiki');
-
-  require('./lib/legacy.coffee');
-
-}).call(this);
-
-});
-require("/client/client.coffee");
-})();
+},{"./util.coffee":5,"./active.coffee":9}]},{},[1]);
